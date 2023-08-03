@@ -60,9 +60,13 @@ class GlobalForecastDataModule(LightningDataModule):
             out_variables = [out_variables]
             self.hparams.out_variables = out_variables
 
-        self.lister_train = list(dp.iter.FileLister(os.path.join(root_dir, "train")))
-        self.lister_val = list(dp.iter.FileLister(os.path.join(root_dir, "val")))
-        self.lister_test = list(dp.iter.FileLister(os.path.join(root_dir, "test")))
+        #self.lister_train = list(dp.iter.FileLister(os.path.join(root_dir, "train")))
+        #self.lister_val = list(dp.iter.FileLister(os.path.join(root_dir, "val")))
+        self.lister_train = [] 
+        self.lister_val = [] 
+        #self.lister_test = list(dp.iter.FileLister(os.path.join(root_dir, "test")))
+        PATH = ['/data0/datasets/weatherbench/data/weatherbench/era5/5.625deg_npz/test_new/test/2017_0.npz']
+        self.lister_test = PATH 
 
         self.transforms = self.get_normalize()
         self.output_transforms = self.get_normalize(out_variables)
