@@ -5,7 +5,7 @@
 [![Documentation](https://img.shields.io/badge/docs-passing-brightgreen)](https://microsoft.github.io/ClimaX)
 [![Paper](https://img.shields.io/badge/arXiv-2301.10343-blue)](https://arxiv.org/abs/2301.10343)
 
-# ClimaXplainability - Explainability Expeirments on ClimaX 
+# ClimaXplainability - Explainability Experiments on ClimaX 
 
 > More info coming soon!
 
