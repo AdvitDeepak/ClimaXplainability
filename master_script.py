@@ -41,7 +41,7 @@ def one_run(params):
     cmd = f"""python /home/{params.user}/ClimaX/src/climax/global_forecast/test.py \
         --config /home/{params.user}/ClimaX/configs/global_forecast_climax.yaml \
         --trainer.strategy=ddp \
-        --trainer.devices=0 \
+        --trainer.devices=1 \
         --trainer.max_epochs=50 \
         --data.root_dir={params.data}\
         --data.predict_range={str(params.hours)}\

@@ -65,7 +65,8 @@ class GlobalForecastDataModule(LightningDataModule):
         self.lister_train = [] 
         self.lister_val = [] 
         #self.lister_test = list(dp.iter.FileLister(os.path.join(root_dir, "test")))
-        PATH = ['/data0/datasets/weatherbench/data/weatherbench/era5/5.625deg_npz/test_new/test/2017_0.npz']
+        # PATH = ['/data0/datasets/weatherbench/data/weatherbench/era5/5.625deg_npz/test_new/test/2017_0.npz']
+        PATH = ['/home/prateiksinha/test_new2/test/2017_0.npz']
         self.lister_test = PATH 
 
         self.transforms = self.get_normalize()
