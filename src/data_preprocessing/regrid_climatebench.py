@@ -87,9 +87,9 @@ def main(
     constant_vars = ['CO2', 'CH4']
     for p in ps:
         x = xr.open_dataset(p)
-        if 'input' in p:
-            for v in constant_vars:
-                x[v] = x[v].expand_dims(dim={'latitude': 96, 'longitude': 144}, axis=(1,2))
+        # if 'input' in p:
+        #     for v in constant_vars:
+        #         x[v] = x[v].expand_dims(dim={'latitude': 96, 'longitude': 144}, axis=(1,2))
         x_regridded = regrid(x, ddeg_out, reuse_weights=False)
         x_regridded.to_netcdf(os.path.join(save_path, os.path.basename(p)))
 

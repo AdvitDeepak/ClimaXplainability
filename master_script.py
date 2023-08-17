@@ -30,9 +30,10 @@ import subprocess
 class Params(): 
     def __init__(self, user): 
         self.user = "prateiksinha" if (user == "P") else "advit"
-        self.data = "/home/prateiksinha/test_new2" if (user == "P") else "/data0/datasets/weatherbench/data/weatherbench/era5/5.625deg_npz/test_new"
-        self.hours = 2
+        self.data = "/home/prateiksinha/new_data/processed/mpi" if (user == "P") else "/data0/datasets/weatherbench/data/weatherbench/era5/5.625deg_npz/test_new"
+        self.hours = 24
         self.out_vars = ['2m_temperature']
+        # self.out_vars = ['temperature']
         self.batch_size = 1 
 
 

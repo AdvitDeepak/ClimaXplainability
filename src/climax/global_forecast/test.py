@@ -15,6 +15,7 @@ def main():
         datamodule_class=GlobalForecastDataModule,
         seed_everything_default=42,
         save_config_overwrite=True,
+        # save_config_kwargs={"overwrite": True},
         run=False,
         parser_kwargs={"parser_mode": "omegaconf", "error_handler": None},
     )
@@ -26,7 +27,9 @@ def main():
     cli.model.set_denormalization(mean_denorm, std_denorm)
     cli.model.set_lat_lon(*cli.datamodule.get_lat_lon())
     cli.model.set_pred_range(cli.datamodule.hparams.predict_range)
-    cli.model.set_val_clim(cli.datamodule.val_clim)
+    # cli.model.set_val_clim(cli.datamodule.val_clim)
+    # print('CCCLIIIIMMMMM:::')
+    # print(cli.datamodule.test_clim.shape)
     cli.model.set_test_clim(cli.datamodule.test_clim)
 
     # fit() runs the training
@@ -34,7 +37,11 @@ def main():
 
     # test the trained model
     # cli.trainer.test(cli.model, datamodule=cli.datamodule, ckpt_path="best")
+
     cli.trainer.test(cli.model, datamodule=cli.datamodule)
+
+    # output = cli.trainer.test(cli.model, datamodule=cli.datamodule)
+    # print(output)
 
 
 if __name__ == "__main__":

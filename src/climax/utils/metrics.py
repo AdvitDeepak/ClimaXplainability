@@ -80,6 +80,16 @@ def lat_weighted_mse_val(pred, y, transform, vars, lat, clim, log_postfix):
 
     error = (pred - y) ** 2  # [B, V, H, W]
 
+    # print("LAT SHAPE: ")
+    # print(lat.shape)
+
+    import time
+    import numpy as np
+    np.save(f'/home/prateiksinha/results_mpi/pred_{time.time()}_.np', pred.cpu().numpy())
+    np.save(f'/home/prateiksinha/results_mpi/y_{time.time()}_.np', y.cpu().numpy())
+    print(pred.shape)
+    print(y.shape)
+
     # lattitude weights
     w_lat = np.cos(np.deg2rad(lat))
     w_lat = w_lat / w_lat.mean()  # (H, )
@@ -88,7 +98,15 @@ def lat_weighted_mse_val(pred, y, transform, vars, lat, clim, log_postfix):
     loss_dict = {}
     with torch.no_grad():
         for i, var in enumerate(vars):
-            loss_dict[f"w_mse_{var}_{log_postfix}"] = (error[:, i] * w_lat).mean()
+            try:
+                loss_dict[f"w_mse_{var}_{log_postfix}"] = (error[:, i] * w_lat).mean()
+            except:
+                print(i)
+                print(error[:, i].shape)
+                print(error.shape)
+                print(w_lat.shape)
+                loss_dict[f"w_mse_{var}_{log_postfix}"] = (error[:, i] * w_lat).mean()
+
 
     loss_dict["w_mse"] = np.mean([loss_dict[k].cpu() for k in loss_dict.keys()])
 
@@ -134,6 +152,11 @@ def lat_weighted_acc(pred, y, transform, vars, lat, clim, log_postfix):
     vars: list of variable names
     lat: H
     """
+    # print(pred.shape)
+    # print(y.shape)
+    # print(clim.shape)
+    # print(vars)
+    # print(lat.shape)
 
     pred = transform(pred)
     y = transform(y)

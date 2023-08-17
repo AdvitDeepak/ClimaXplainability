@@ -72,7 +72,9 @@ class GlobalForecastDataModule(LightningDataModule):
         self.transforms = self.get_normalize()
         self.output_transforms = self.get_normalize(out_variables)
 
-        self.val_clim = self.get_climatology("val", out_variables)
+        # self.val_clim = self.get_climatology("val", out_variables)
+        print('OUT VARIABLES:########################')
+        print(out_variables)
         self.test_clim = self.get_climatology("test", out_variables)
 
         self.data_train: Optional[IterableDataset] = None
@@ -82,6 +84,7 @@ class GlobalForecastDataModule(LightningDataModule):
     def get_normalize(self, variables=None):
         if variables is None:
             variables = self.hparams.variables
+        # print(variables)
         normalize_mean = dict(np.load(os.path.join(self.hparams.root_dir, "normalize_mean.npz")))
         mean = []
         for var in variables:
@@ -104,8 +107,14 @@ class GlobalForecastDataModule(LightningDataModule):
         clim_dict = np.load(path)
         if variables is None:
             variables = self.hparams.variables
+        print('PATH: ')
+        print(path)
+        print('VARIABLES: ')
+        print(variables)
         clim = np.concatenate([clim_dict[var] for var in variables])
         clim = torch.from_numpy(clim)
+        print("CLIM_SHAPE: ")
+        print(clim.shape)
         return clim
 
     def setup(self, stage: Optional[str] = None):

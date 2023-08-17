@@ -193,6 +193,12 @@ class GlobalForecastModule(LightningModule):
                 sync_dist=True,
             )
         return loss_dict
+    
+    # def test_epoch_end(self, outputs): 
+    # #   results = process_outputs(outputs)
+    # #   self.test_results = results
+    # #   return results 
+    #     return outputs
 
     def configure_optimizers(self):
         decay = []
