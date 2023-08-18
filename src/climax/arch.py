@@ -266,5 +266,12 @@ class ClimaX(nn.Module):
         return loss, preds
 
     def evaluate(self, x, y, lead_times, variables, out_variables, transform, metrics, lat, clim, log_postfix):
+        print(f"(arch.py) Entered the evaluate function of the model")
+        np.save("/home/advit/ClimateData/run_dumps/x_input.npy", x.cpu().numpy())
+        np.save("/home/advit/ClimateData/run_dumps/y_output.npy", y.cpu().numpy())
+
         _, preds = self.forward(x, y, lead_times, variables, out_variables, metric=None, lat=lat)
+        print(f"(arch.py) Received predictions, calling metrics now")
+        np.save("/home/advit/ClimateData/run_dumps/pred.npy", preds.cpu().detach().numpy())
+
         return [m(preds, y, transform, out_variables, lat, clim, log_postfix) for m in metrics]

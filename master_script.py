@@ -30,20 +30,25 @@ import subprocess
 class Params(): 
     def __init__(self, user): 
         self.user = "prateiksinha" if (user == "P") else "advit"
-        self.data = "/home/prateiksinha/new_data/processed/mpi" if (user == "P") else "/data0/datasets/weatherbench/data/weatherbench/era5/5.625deg_npz/test_new"
+        print(f"User is {self.user}")
+        if user == "P": 
+            self.data = "/home/prateiksinha/new_data/processed/mpi" 
+        else: 
+            self.data = "/home/advit/ClimateData/processed_new/AWI"
+
         self.hours = 24
         self.out_vars = ['2m_temperature']
-        # self.out_vars = ['temperature']
         self.batch_size = 1 
 
 
 def one_run(params): 
 
-    cmd = f"""python /home/{params.user}/ClimaX/src/climax/global_forecast/test.py \
-        --config /home/{params.user}/ClimaX/configs/global_forecast_climax.yaml \
+    cmd = f"""python /home/{params.user}/ClimaXplainability/src/climax/global_forecast/test.py \
+        --config /home/{params.user}/ClimaXplainability/configs/global_forecast_climax.yaml \
         --trainer.strategy=ddp \
         --trainer.devices=1 \
         --trainer.max_epochs=50 \
+        --trainer.default_root_dir=/home/{params.user}/ClimaXplainability/exps/global_forecast_climax \
         --data.root_dir={params.data}\
         --data.predict_range={str(params.hours)}\
         --data.out_variables={str(params.out_vars)} \
@@ -54,24 +59,16 @@ def one_run(params):
         --model.beta_2="0.99" \
         --model.weight_decay=1e-5"""
 
-    # Run the command 
 
-    #args = 
-
-    #res = subprocess.call(cmd, args)
     res = os.system(cmd)
-
-    # Parse the output to extract what's relevant 
-
-    # Store + Return relevant results
-
     return res 
 
 
 def main(): 
-    params = Params("P") # Advit's params
+    params = Params("A") # Advit's params
     res = one_run(params)
 
+    print("About to print results!")
     print(res)
 
 

@@ -83,12 +83,12 @@ def lat_weighted_mse_val(pred, y, transform, vars, lat, clim, log_postfix):
     # print("LAT SHAPE: ")
     # print(lat.shape)
 
-    import time
-    import numpy as np
-    np.save(f'/home/prateiksinha/results_mpi/pred_{time.time()}_.np', pred.cpu().numpy())
-    np.save(f'/home/prateiksinha/results_mpi/y_{time.time()}_.np', y.cpu().numpy())
-    print(pred.shape)
-    print(y.shape)
+    # import time
+    # import numpy as np
+    # np.save(f'/home/prateiksinha/results_mpi/pred_{time.time()}_.np', pred.cpu().numpy())
+    # np.save(f'/home/prateiksinha/results_mpi/y_{time.time()}_.np', y.cpu().numpy())
+    # print(pred.shape)
+    # print(y.shape)
 
     # lattitude weights
     w_lat = np.cos(np.deg2rad(lat))

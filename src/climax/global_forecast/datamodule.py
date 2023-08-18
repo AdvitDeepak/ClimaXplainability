@@ -64,17 +64,13 @@ class GlobalForecastDataModule(LightningDataModule):
         #self.lister_val = list(dp.iter.FileLister(os.path.join(root_dir, "val")))
         self.lister_train = [] 
         self.lister_val = [] 
-        #self.lister_test = list(dp.iter.FileLister(os.path.join(root_dir, "test")))
-        # PATH = ['/data0/datasets/weatherbench/data/weatherbench/era5/5.625deg_npz/test_new/test/2017_0.npz']
-        PATH = ['/home/prateiksinha/test_new2/test/2017_0.npz']
-        self.lister_test = PATH 
+
+        self.lister_test = list(dp.iter.FileLister(os.path.join(root_dir, "test")))
 
         self.transforms = self.get_normalize()
         self.output_transforms = self.get_normalize(out_variables)
 
         # self.val_clim = self.get_climatology("val", out_variables)
-        print('OUT VARIABLES:########################')
-        print(out_variables)
         self.test_clim = self.get_climatology("test", out_variables)
 
         self.data_train: Optional[IterableDataset] = None
@@ -107,10 +103,7 @@ class GlobalForecastDataModule(LightningDataModule):
         clim_dict = np.load(path)
         if variables is None:
             variables = self.hparams.variables
-        print('PATH: ')
-        print(path)
-        print('VARIABLES: ')
-        print(variables)
+
         clim = np.concatenate([clim_dict[var] for var in variables])
         clim = torch.from_numpy(clim)
         print("CLIM_SHAPE: ")
@@ -202,7 +195,7 @@ class GlobalForecastDataModule(LightningDataModule):
         )
 
     def test_dataloader(self):
-        return DataLoader(
+        X = DataLoader(
             self.data_test,
             batch_size=self.hparams.batch_size,
             shuffle=False,
@@ -211,3 +204,9 @@ class GlobalForecastDataModule(LightningDataModule):
             pin_memory=self.hparams.pin_memory,
             collate_fn=collate_fn,
         )
+
+        print("Information about DataLoader 'X':")
+        print("-----------------------------------")
+        print(self.data_test)
+
+        return X 

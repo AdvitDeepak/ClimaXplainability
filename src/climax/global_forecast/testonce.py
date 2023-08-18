@@ -1,12 +1,7 @@
-# Copyright (c) Microsoft Corporation.
-# Licensed under the MIT license.
-
-# credits: https://github.com/ashleve/lightning-hydra-template/blob/main/src/models/mnist_module.py
-from typing import Any
-
-import torch
-from pytorch_lightning import LightningModule
 from torchvision.transforms import transforms
+from typing import Any
+import torch 
+from torch.utils.data import DataLoader, IterableDataset
 
 from climax.arch import ClimaX
 from climax.utils.lr_scheduler import LinearWarmupCosineAnnealingLR
@@ -18,22 +13,22 @@ from climax.utils.metrics import (
 )
 from climax.utils.pos_embed import interpolate_pos_embed
 
+from climax.pretrain.datamodule import collate_fn
+from climax.pretrain.dataset import (
+    Forecast,
+    IndividualForecastDataIter,
+    NpyReader,
+    ShuffleIterableDataset,
+)
 
-class GlobalForecastModule(LightningModule):
-    """Lightning module for global forecasting with the ClimaX model.
+import numpy as np 
+import os 
+from pytorch_lightning import LightningModule
 
-    Args:
-        net (ClimaX): ClimaX model.
-        pretrained_path (str, optional): Path to pre-trained checkpoint.
-        lr (float, optional): Learning rate.
-        beta_1 (float, optional): Beta 1 for AdamW.
-        beta_2 (float, optional): Beta 2 for AdamW.
-        weight_decay (float, optional): Weight decay for AdamW.
-        warmup_epochs (int, optional): Number of warmup epochs.
-        max_epochs (int, optional): Number of total epochs.
-        warmup_start_lr (float, optional): Starting learning rate for warmup.
-        eta_min (float, optional): Minimum learning rate.
-    """
+
+ROOT_DIR = "/home/advit/ClimateData/processed_new/AWI"
+
+class ModifiedGlobalForecastModule(LightningModule): 
 
     def __init__(
         self,
@@ -49,10 +44,11 @@ class GlobalForecastModule(LightningModule):
         eta_min: float = 1e-8,
     ):
         super().__init__()
-        self.save_hyperparameters(logger=False, ignore=["net"])
+        ##self.save_hyperparameters(logger=False, ignore=["net"])
         self.net = net
         if len(pretrained_path) > 0:
             self.load_pretrained_weights(pretrained_path)
+
 
     def load_pretrained_weights(self, pretrained_path):
         if pretrained_path.startswith("http"):
@@ -95,70 +91,21 @@ class GlobalForecastModule(LightningModule):
     def set_pred_range(self, r):
         self.pred_range = r
 
-    def set_val_clim(self, clim):
-        self.val_clim = clim
-
     def set_test_clim(self, clim):
         self.test_clim = clim
 
-    def training_step(self, batch: Any, batch_idx: int):
-        x, y, lead_times, variables, out_variables = batch
-
-        loss_dict, _ = self.net.forward(x, y, lead_times, variables, out_variables, [lat_weighted_mse], lat=self.lat)
-        loss_dict = loss_dict[0]
-        for var in loss_dict.keys():
-            self.log(
-                "train/" + var,
-                loss_dict[var],
-                on_step=True,
-                on_epoch=False,
-                prog_bar=True,
-            )
-        loss = loss_dict["loss"]
-
-        return loss
-
-    def validation_step(self, batch: Any, batch_idx: int):
-        x, y, lead_times, variables, out_variables = batch
-
-        if self.pred_range < 24:
-            log_postfix = f"{self.pred_range}_hours"
-        else:
-            days = int(self.pred_range / 24)
-            log_postfix = f"{days}_days"
-
-        all_loss_dicts = self.net.evaluate(
-            x,
-            y,
-            lead_times,
-            variables,
-            out_variables,
-            transform=self.denormalization,
-            metrics=[lat_weighted_mse_val, lat_weighted_rmse, lat_weighted_acc],
-            lat=self.lat,
-            clim=self.val_clim,
-            log_postfix=log_postfix,
-        )
-
-        loss_dict = {}
-        for d in all_loss_dicts:
-            for k in d.keys():
-                loss_dict[k] = d[k]
-
-        for var in loss_dict.keys():
-            self.log(
-                "val/" + var,
-                loss_dict[var],
-                on_step=False,
-                on_epoch=True,
-                prog_bar=False,
-                sync_dist=True,
-            )
-        return loss_dict
 
     def test_step(self, batch: Any, batch_idx: int):
         print(f"(module.py) Entered test_step function w/ batch_idx {batch_idx}")
         x, y, lead_times, variables, out_variables = batch
+        print("X", x)
+        print("Y", y)
+        print("LEAD", lead_times)
+        print("IN VARS", variables)
+        print("OUT VARS", out_variables)
+
+
+        self.pred_range = 1
 
         if self.pred_range < 24:
             log_postfix = f"{self.pred_range}_hours"
@@ -169,11 +116,11 @@ class GlobalForecastModule(LightningModule):
         
         print(f"(module.py) About to call self.net.evaluate() function")
         all_loss_dicts = self.net.evaluate(
-            x,
-            y,
-            lead_times,
-            variables,
-            out_variables,
+            x=x,
+            y=y,
+            lead_times=lead_times,
+            variables=variables,
+            out_variables=out_variables,
             transform=self.denormalization,
             metrics=[lat_weighted_mse_val, lat_weighted_rmse, lat_weighted_acc],
             lat=self.lat,
@@ -185,23 +132,8 @@ class GlobalForecastModule(LightningModule):
         for d in all_loss_dicts:
             for k in d.keys():
                 loss_dict[k] = d[k]
-
-        for var in loss_dict.keys():
-            self.log(
-                "test/" + var,
-                loss_dict[var],
-                on_step=False,
-                on_epoch=True,
-                prog_bar=False,
-                sync_dist=True,
-            )
         return loss_dict
     
-    # def test_epoch_end(self, outputs): 
-    # #   results = process_outputs(outputs)
-    # #   self.test_results = results
-    # #   return results 
-    #     return outputs
 
     def configure_optimizers(self):
         decay = []
@@ -239,3 +171,98 @@ class GlobalForecastModule(LightningModule):
         scheduler = {"scheduler": lr_scheduler, "interval": "step", "frequency": 1}
 
         return {"optimizer": optimizer, "lr_scheduler": scheduler}
+
+
+def get_normalize(variables=['2m_temperature']):
+    # print(variables)
+    normalize_mean = dict(np.load(os.path.join(ROOT_DIR, "normalize_mean.npz")))
+    mean = []
+    for var in variables:
+        if var != "total_precipitation":
+            mean.append(normalize_mean[var])
+        else:
+            mean.append(np.array([0.0]))
+    normalize_mean = np.concatenate(mean)
+    normalize_std = dict(np.load(os.path.join(ROOT_DIR, "normalize_std.npz")))
+    normalize_std = np.concatenate([normalize_std[var] for var in variables])
+    return transforms.Normalize(normalize_mean, normalize_std)
+
+
+def get_lat_lon():
+    lat = np.load(os.path.join(ROOT_DIR, "lat.npy"))
+    lon = np.load(os.path.join(ROOT_DIR, "lon.npy"))
+    return lat, lon
+
+def get_climatology(partition, variables):
+    path = os.path.join(ROOT_DIR, partition, "climatology.npz")
+    clim_dict = np.load(path)
+
+    clim = np.concatenate([clim_dict[var] for var in variables])
+    clim = torch.from_numpy(clim)
+    return clim
+
+
+if __name__=='__main__': 
+
+    print("Got climax model")
+    pretrained_path = 'https://huggingface.co/tungnd/climax/resolve/main/5.625deg.ckpt' 
+
+    mod = ModifiedGlobalForecastModule(ClimaX(['2m_temperature']), pretrained_path) 
+
+
+    our_transforms = get_normalize()
+    our_output_transforms = get_normalize(['2m_temperature'])
+    
+    normalization = our_output_transforms
+    mean_norm, std_norm = normalization.mean, normalization.std
+    mean_denorm, std_denorm = -mean_norm / std_norm, 1 / std_norm
+    mod.set_denormalization(mean_denorm, std_denorm)
+    
+    mod.set_lat_lon(*get_lat_lon())
+    mod.set_pred_range(1)
+
+    clim = get_climatology("test", ['2m_temperature'])
+    mod.set_test_clim(clim)
+
+    data_test = IndividualForecastDataIter(
+                    Forecast(
+                        NpyReader(
+                            file_list=["/home/advit/ClimateData/processed_new/AWI/test/1990_0.npz"],
+                            start_idx=0,
+                            end_idx=1,
+                            variables=['2m_temperature'],
+                            out_variables=['2m_temperature'],
+                            shuffle=False,
+                            multi_dataset_training=False,
+                        ),
+                        max_predict_range=1,
+                        random_lead_time=False,
+                        hrs_each_step=1,
+                    ),
+                    transforms=our_transforms,
+                    output_transforms=our_output_transforms,
+                )
+
+
+    X = DataLoader(
+                data_test,
+                batch_size=1,
+                shuffle=False,
+                drop_last=False,
+                num_workers=1,
+                pin_memory=False,
+                collate_fn=collate_fn,
+            )
+
+
+    loss = ""
+    idx = 0 
+    batch = None 
+    for batch in X: 
+        print(idx)
+        idx += 1
+
+        batch = batch
+
+    loss = mod.test_step(batch, idx)
+    print(loss)

@@ -2,8 +2,8 @@ seed_everything: 42
 
 # ---------------------------- TRAINER -------------------------------------------
 trainer:
-  default_root_dir: ${oc.env:OUTPUT_DIR,/home/prateiksinha/ClimaX/exps/global_forecast_climax}
-
+  default_root_dir: "/home/advit/ClimaXplainability/exps/global_forecast_climax "
+  # NEEED TO MAKE THE ABOVE MODULAR OMFG 
   precision: 16
 
   gpus: null
