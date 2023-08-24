@@ -267,11 +267,43 @@ class ClimaX(nn.Module):
 
     def evaluate(self, x, y, lead_times, variables, out_variables, transform, metrics, lat, clim, log_postfix):
         print(f"(arch.py) Entered the evaluate function of the model")
-        np.save("/home/advit/ClimateData/run_dumps/x_input.npy", x.cpu().numpy())
-        np.save("/home/advit/ClimateData/run_dumps/y_output.npy", y.cpu().numpy())
+        # np.save("/home/prateiksinha/ClimaX/visualization/x_input.npy", x.cpu().numpy())
+        # np.save("/home/prateiksinha/ClimaX/visualization/y_output.npy", y.cpu().numpy())
 
         _, preds = self.forward(x, y, lead_times, variables, out_variables, metric=None, lat=lat)
-        print(f"(arch.py) Received predictions, calling metrics now")
-        np.save("/home/advit/ClimateData/run_dumps/pred.npy", preds.cpu().detach().numpy())
+        # print(f"(arch.py) Received predictions, calling metrics now")
+        # np.save("/home/prateiksinha/ClimaX/visualization/pred.npy", preds.cpu().detach().numpy())
 
-        return [m(preds, y, transform, out_variables, lat, clim, log_postfix) for m in metrics]
+        metric_dictionary = {m.__name__ : (m(preds, y, transform, out_variables, lat, clim, log_postfix)) for m in metrics}
+        for i in metric_dictionary.keys():
+            xs = metric_dictionary[i]
+            for j, val in xs.items():
+                if torch.is_tensor(val):
+                    val = val.item()
+                else:
+                    val = val.tolist()
+                metric_dictionary[i][j] = val
+
+        # print(metric_dictionary)
+
+        json_results = {
+            'input' : x.cpu().numpy().tolist(), 
+            'output' : y.cpu().numpy().tolist(), 
+            'prediction' : preds.detach().numpy().tolist(), 
+            'variables': variables,
+            'out_variables': out_variables,
+            'lead_times': lead_times.item(),
+            'metrics' : metric_dictionary
+        }
+
+        # import json
+        # from time import time
+        # with open(f"/home/prateiksinha/ClimaX/temp_files/{time()}", "w") as outfile:
+        #     json.dump(json_results, outfile)
+
+        return [m(preds, y, transform, out_variables, lat, clim, log_postfix) for m in metrics], json_results
+
+
+# class ReturnToJSON(error):
+#     def __init__(self, dict) -> None:
+#         self.dict = dict

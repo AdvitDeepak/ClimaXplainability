@@ -25,8 +25,10 @@ import numpy as np
 import os 
 from pytorch_lightning import LightningModule
 
+from datetime import datetime, timedelta
 
-ROOT_DIR = "/home/advit/ClimateData/processed_new/AWI"
+# ROOT_DIR = "/home/advit/ClimateData/processed_new/AWI"
+ROOT_DIR = "/home/prateiksinha/new_data/processed/awi"
 
 class ModifiedGlobalForecastModule(LightningModule): 
 
@@ -94,7 +96,6 @@ class ModifiedGlobalForecastModule(LightningModule):
     def set_test_clim(self, clim):
         self.test_clim = clim
 
-
     def test_step(self, batch: Any, batch_idx: int):
         print(f"(module.py) Entered test_step function w/ batch_idx {batch_idx}")
         x, y, lead_times, variables, out_variables = batch
@@ -115,7 +116,7 @@ class ModifiedGlobalForecastModule(LightningModule):
 
         
         print(f"(module.py) About to call self.net.evaluate() function")
-        all_loss_dicts = self.net.evaluate(
+        all_loss_dicts, json = self.net.evaluate(
             x=x,
             y=y,
             lead_times=lead_times,
@@ -132,7 +133,7 @@ class ModifiedGlobalForecastModule(LightningModule):
         for d in all_loss_dicts:
             for k in d.keys():
                 loss_dict[k] = d[k]
-        return loss_dict
+        return loss_dict, json
     
 
     def configure_optimizers(self):
@@ -202,13 +203,83 @@ def get_climatology(partition, variables):
     return clim
 
 
-if __name__=='__main__': 
+def days_in_year(year=datetime.now().year):
+    import calendar
+    return 365 + calendar.isleap(int(year))
 
-    print("Got climax model")
+def year_to_days_since_1850(year = None, partition = None, partitions_per_year = 12):
+    
+    reference_date = datetime(1850, 1, 1, 0, 0, 0)
+    new_date = datetime(int(year), 1, 1, 0, 0, 0)
+    year_in_days = (new_date - reference_date).days
+
+    if partition is None:
+        return year_in_days
+    else:
+        return year_in_days + ((int(partition) / partitions_per_year) * days_in_year(year))
+
+def append_to_json(j, file_name, partitions_per_year):
+    j['climate_model_init'] = ROOT_DIR.split('/')[-1]
+    year, partition = tuple(file_name.split('/')[-1].strip('.npz').split('_'))
+    j['days_since_1850'] = year_to_days_since_1850(year, partition, partitions_per_year)
+    return j
+
+def run(custom_lead_time):
     pretrained_path = 'https://huggingface.co/tungnd/climax/resolve/main/5.625deg.ckpt' 
 
-    mod = ModifiedGlobalForecastModule(ClimaX(['2m_temperature']), pretrained_path) 
-
+    default_vars = [
+        "land_sea_mask",
+        "orography",
+        "lattitude",
+        "2m_temperature",
+        "10m_u_component_of_wind",
+        "10m_v_component_of_wind",
+        "geopotential_50",
+        "geopotential_250",
+        "geopotential_500",
+        "geopotential_600",
+        "geopotential_700",
+        "geopotential_850",
+        "geopotential_925",
+        "u_component_of_wind_50",
+        "u_component_of_wind_250",
+        "u_component_of_wind_500",
+        "u_component_of_wind_600",
+        "u_component_of_wind_700",
+        "u_component_of_wind_850",
+        "u_component_of_wind_925",
+        "v_component_of_wind_50",
+        "v_component_of_wind_250",
+        "v_component_of_wind_500",
+        "v_component_of_wind_600",
+        "v_component_of_wind_700",
+        "v_component_of_wind_850",
+        "v_component_of_wind_925",
+        "temperature_50",
+        "temperature_250",
+        "temperature_500",
+        "temperature_600",
+        "temperature_700",
+        "temperature_850",
+        "temperature_925",
+        "relative_humidity_50",
+        "relative_humidity_250",
+        "relative_humidity_500",
+        "relative_humidity_600",
+        "relative_humidity_700",
+        "relative_humidity_850",
+        "relative_humidity_925",
+        "specific_humidity_50",
+        "specific_humidity_250",
+        "specific_humidity_500",
+        "specific_humidity_600",
+        "specific_humidity_700",
+        "specific_humidity_850",
+        "specific_humidity_925",
+        ]
+    # mod = ModifiedGlobalForecastModule(ClimaX(['2m_temperature']), pretrained_path) 
+    mod = ModifiedGlobalForecastModule(ClimaX(default_vars), pretrained_path) 
+    print("Got climax model")
 
     our_transforms = get_normalize()
     our_output_transforms = get_normalize(['2m_temperature'])
@@ -224,10 +295,11 @@ if __name__=='__main__':
     clim = get_climatology("test", ['2m_temperature'])
     mod.set_test_clim(clim)
 
+    file_list = ["/home/prateiksinha/new_data/processed/awi/test/1990_0.npz"]
     data_test = IndividualForecastDataIter(
                     Forecast(
                         NpyReader(
-                            file_list=["/home/advit/ClimateData/processed_new/AWI/test/1990_0.npz"],
+                            file_list=file_list,
                             start_idx=0,
                             end_idx=1,
                             variables=['2m_temperature'],
@@ -235,7 +307,8 @@ if __name__=='__main__':
                             shuffle=False,
                             multi_dataset_training=False,
                         ),
-                        max_predict_range=1,
+                        # max_predict_range=lead,
+                        max_predict_range= custom_lead_time,
                         random_lead_time=False,
                         hrs_each_step=1,
                     ),
@@ -254,15 +327,36 @@ if __name__=='__main__':
                 collate_fn=collate_fn,
             )
 
-
     loss = ""
     idx = 0 
     batch = None 
+
+    final_json = []
+    # first = True
+
     for batch in X: 
         print(idx)
         idx += 1
-
         batch = batch
+        loss, output_json = mod.test_step(batch, idx)
+        final_json.append(append_to_json(output_json, file_list[0], 12))
+        # if not first:
+        #     final_json[-1]['lead_times'] = final_json[-1]['lead_times'] + final_json[-2]['lead_times'] 
+        # first = False
+        print(loss)
+        break
 
-    loss = mod.test_step(batch, idx)
-    print(loss)
+    import json
+    from time import time
+    with open(f"/home/prateiksinha/ClimaX/output_jsons/final_json_{(custom_lead_time):04}.json", "w") as outfile:
+        json.dump(final_json, outfile)
+
+
+if __name__=='__main__': 
+
+    # 168 hours in a week
+    for lead_time in range(1, (4 * 168) + 1): # 4 weeks
+        run(lead_time)
+    
+    
+    
