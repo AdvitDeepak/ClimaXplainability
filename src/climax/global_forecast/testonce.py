@@ -28,7 +28,8 @@ from pytorch_lightning import LightningModule
 from datetime import datetime, timedelta
 
 # ROOT_DIR = "/home/advit/ClimateData/processed_new/AWI"
-ROOT_DIR = "/home/prateiksinha/new_data/processed/awi"
+# ROOT_DIR = "/home/prateiksinha/new_data/processed/awi"
+ROOT_DIR = "/home/advit/test_new2/"
 
 class ModifiedGlobalForecastModule(LightningModule): 
 
@@ -224,7 +225,15 @@ def append_to_json(j, file_name, partitions_per_year):
     j['days_since_1850'] = year_to_days_since_1850(year, partition, partitions_per_year)
     return j
 
-def run(custom_lead_time):
+
+"""
+
+The heart of our testonce.py script, the run() method. 
+
+"""
+
+
+def run(npz_path, lead_time, in_variables, out_variables, out_dir):
     pretrained_path = 'https://huggingface.co/tungnd/climax/resolve/main/5.625deg.ckpt' 
 
     default_vars = [
@@ -277,12 +286,11 @@ def run(custom_lead_time):
         "specific_humidity_850",
         "specific_humidity_925",
         ]
-    # mod = ModifiedGlobalForecastModule(ClimaX(['2m_temperature']), pretrained_path) 
+
     mod = ModifiedGlobalForecastModule(ClimaX(default_vars), pretrained_path) 
-    print("Got climax model")
 
     our_transforms = get_normalize()
-    our_output_transforms = get_normalize(['2m_temperature'])
+    our_output_transforms = get_normalize(out_variables)
     
     normalization = our_output_transforms
     mean_norm, std_norm = normalization.mean, normalization.std
@@ -290,25 +298,25 @@ def run(custom_lead_time):
     mod.set_denormalization(mean_denorm, std_denorm)
     
     mod.set_lat_lon(*get_lat_lon())
-    mod.set_pred_range(1)
+    mod.set_pred_range(1) #TODO - What is this? Is 1 okay? 
 
-    clim = get_climatology("test", ['2m_temperature'])
+    clim = get_climatology("test", out_variables) # TODO - is this in_variables or out_variables? 
     mod.set_test_clim(clim)
 
-    file_list = ["/home/prateiksinha/new_data/processed/awi/test/1990_0.npz"]
+    file_list = [npz_path]
     data_test = IndividualForecastDataIter(
                     Forecast(
                         NpyReader(
                             file_list=file_list,
                             start_idx=0,
                             end_idx=1,
-                            variables=['2m_temperature'],
-                            out_variables=['2m_temperature'],
+                            variables=in_variables,
+                            out_variables=out_variables,
                             shuffle=False,
                             multi_dataset_training=False,
                         ),
                         # max_predict_range=lead,
-                        max_predict_range= custom_lead_time,
+                        max_predict_range= lead_time,
                         random_lead_time=False,
                         hrs_each_step=1,
                     ),
@@ -333,30 +341,54 @@ def run(custom_lead_time):
 
     final_json = []
     # first = True
-
     for batch in X: 
         print(idx)
         idx += 1
         batch = batch
         loss, output_json = mod.test_step(batch, idx)
         final_json.append(append_to_json(output_json, file_list[0], 12))
-        # if not first:
-        #     final_json[-1]['lead_times'] = final_json[-1]['lead_times'] + final_json[-2]['lead_times'] 
-        # first = False
+
         print(loss)
         break
 
     import json
     from time import time
-    with open(f"/home/prateiksinha/ClimaX/output_jsons/final_json_{(custom_lead_time):04}.json", "w") as outfile:
+    with open(f"{out_dir}/final_invars_{len(in_variables)}_hrs_{(lead_time):04}.json", "w") as outfile:
         json.dump(final_json, outfile)
 
 
+"""
+
+The main testing script. 
+Currently seeing smoothness 
+
+"""
+
 if __name__=='__main__': 
 
-    # 168 hours in a week
-    for lead_time in range(1, (4 * 168) + 1): # 4 weeks
-        run(lead_time)
-    
+    BASE_VARIABLES = ['2m_temperature']
+    #VARIABLES_TO_TRY = ['10m_u_component_of_wind', '10m_v_component_of_wind', 'geopotential_50', 'temperature_50', 'temperature_250']
+    VARIABLES_TO_TRY = ['temperature_50', 'temperature_250', 'temperature_500', 'temperature_600']
+
+    DUMP_DIRECTORY = r"/home/advit/aug29_exps2"
+    NPZ_PATH = r"/home/advit/test_new2/test/2017_0.npz"
+
+
+    # Run ClimaX with each subset of variables
+
+    for i in range(len(VARIABLES_TO_TRY)):
+        in_variables = BASE_VARIABLES + VARIABLES_TO_TRY[0:i]
+        out_variables = BASE_VARIABLES
+
+        #LEAD_TIMES = [6, 12, 18, 24, 30, 36, 42, 48]
+        LEAD_TIMES = [6] 
+
+        print(f"Running experiment w/ in_vars: {in_variables}")
+
+        for time in LEAD_TIMES: 
+            print(f" - Lead Time: {time}")
+            run(npz_path=NPZ_PATH, lead_time=time, in_variables=in_variables, out_variables=out_variables, out_dir=DUMP_DIRECTORY)
+
+        print(f"")
     
     
