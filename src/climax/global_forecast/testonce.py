@@ -370,8 +370,8 @@ if __name__=='__main__':
     #VARIABLES_TO_TRY = ['10m_u_component_of_wind', '10m_v_component_of_wind', 'geopotential_50', 'temperature_50', 'temperature_250']
     VARIABLES_TO_TRY = ['temperature_50', 'temperature_250', 'temperature_500', 'temperature_600']
 
-    DUMP_DIRECTORY = r"/home/advit/aug29_exps2"
-    NPZ_PATH = r"/home/advit/test_new2/test/2017_0.npz"
+    DUMP_DIRECTORY = r"/home/prateiksinha/ClimaX/aug_31_jsons"
+    NPZ_PATH = r"/home/prateiksinha/test_new2/test/2017_0.npz"
 
 
     # Run ClimaX with each subset of variables

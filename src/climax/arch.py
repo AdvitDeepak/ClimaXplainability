@@ -287,9 +287,9 @@ class ClimaX(nn.Module):
         # print(metric_dictionary)
 
         json_results = {
-            'input' : x.cpu().numpy().tolist(), 
-            'output' : y.cpu().numpy().tolist(), 
-            'prediction' : preds.detach().numpy().tolist(), 
+            'input' : transform(x).cpu().numpy().tolist(), 
+            'output' : transform(y).cpu().numpy().tolist(), 
+            'prediction' : transform(preds).detach().numpy().tolist(), 
             'variables': variables,
             'out_variables': out_variables,
             'lead_times': lead_times.item(),
