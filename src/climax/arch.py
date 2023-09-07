@@ -265,10 +265,8 @@ class ClimaX(nn.Module):
 
         return loss, preds
 
-    def evaluate(self, x, y, lead_times, variables, out_variables, transform, metrics, lat, clim, log_postfix):
+    def evaluate(self, x, y, lead_times, variables, out_variables, transform, metrics, lat, clim, log_postfix, our_transforms):
         print(f"(arch.py) Entered the evaluate function of the model")
-        # np.save("/home/prateiksinha/ClimaX/visualization/x_input.npy", x.cpu().numpy())
-        # np.save("/home/prateiksinha/ClimaX/visualization/y_output.npy", y.cpu().numpy())
 
         _, preds = self.forward(x, y, lead_times, variables, out_variables, metric=None, lat=lat)
         # print(f"(arch.py) Received predictions, calling metrics now")
@@ -286,10 +284,21 @@ class ClimaX(nn.Module):
 
         # print(metric_dictionary)
 
+        print("Shapes")
+        print(x.shape)
+        print(y.shape)
+        print(preds.shape)
+
+        out_var_ids = self.get_var_ids(tuple(out_variables), x.device)
+        x = x[:, out_var_ids]
+
+        print("TRANSFORMED", x.shape)
+        print(transform)
+
         json_results = {
-            'input' : x.cpu().numpy().tolist(), 
-            'output' : y.cpu().numpy().tolist(), 
-            'prediction' : preds.detach().numpy().tolist(), 
+            'input' : transform(x).cpu().numpy().tolist(), 
+            'output' : transform(y).cpu().numpy().tolist(), 
+            'prediction' : transform(preds).detach().numpy().tolist(), 
             'variables': variables,
             'out_variables': out_variables,
             'lead_times': lead_times.item(),

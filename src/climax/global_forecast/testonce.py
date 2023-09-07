@@ -25,11 +25,13 @@ import numpy as np
 import os 
 from pytorch_lightning import LightningModule
 
+#from climax.climate_learn.src import * 
+
 from datetime import datetime, timedelta
 
 # ROOT_DIR = "/home/advit/ClimateData/processed_new/AWI"
 # ROOT_DIR = "/home/prateiksinha/new_data/processed/awi"
-ROOT_DIR = "/home/advit/test_new2/"
+ROOT_DIR = "/home/data/datasets/climate/era5/1.40625_npz/"
 
 class ModifiedGlobalForecastModule(LightningModule): 
 
@@ -97,14 +99,16 @@ class ModifiedGlobalForecastModule(LightningModule):
     def set_test_clim(self, clim):
         self.test_clim = clim
 
-    def test_step(self, batch: Any, batch_idx: int):
-        print(f"(module.py) Entered test_step function w/ batch_idx {batch_idx}")
+    def test_step(self, batch: Any, batch_idx: int, our_transforms: Any):
+        print(f"(testonce.py) Entered test_step function w/ batch_idx {batch_idx}\n\n")
         x, y, lead_times, variables, out_variables = batch
-        print("X", x)
-        print("Y", y)
-        print("LEAD", lead_times)
-        print("IN VARS", variables)
-        print("OUT VARS", out_variables)
+        #print(np.amin(x.cpu().numpy()))
+        #print(np.amax(x.cpu().numpy()))
+        print("(testonce.py) X", x)
+        print("(testonce.py) Y", y)
+        print("(testonce.py) LEAD", lead_times)
+        print("(testonce.py) IN VARS", variables)
+        print("(testonce.py) OUT VARS", out_variables)
 
 
         self.pred_range = 1
@@ -116,7 +120,7 @@ class ModifiedGlobalForecastModule(LightningModule):
             log_postfix = f"{days}_days"
 
         
-        print(f"(module.py) About to call self.net.evaluate() function")
+        print(f"\n\n(module.py) About to call self.net.evaluate() function")
         all_loss_dicts, json = self.net.evaluate(
             x=x,
             y=y,
@@ -128,6 +132,7 @@ class ModifiedGlobalForecastModule(LightningModule):
             lat=self.lat,
             clim=self.test_clim,
             log_postfix=log_postfix,
+            our_transforms=our_transforms
         )
 
         loss_dict = {}
@@ -234,7 +239,10 @@ The heart of our testonce.py script, the run() method.
 
 
 def run(npz_path, lead_time, in_variables, out_variables, out_dir):
-    pretrained_path = 'https://huggingface.co/tungnd/climax/resolve/main/5.625deg.ckpt' 
+    #pretrained_path = 'https://huggingface.co/tungnd/climax/resolve/main/5.625deg.ckpt' 
+    pretrained_path = 'https://huggingface.co/microsoft/climax/resolve/main/1.40625deg.ckpt'
+
+    #finetuned_checkpoint_6hr_leadtime = '/home/tungnd/climate-learn/results_rebuttal/climax_6/checkpoints/epoch_044.ckpt'
 
     default_vars = [
         "land_sea_mask",
@@ -287,21 +295,28 @@ def run(npz_path, lead_time, in_variables, out_variables, out_dir):
         "specific_humidity_925",
         ]
 
-    mod = ModifiedGlobalForecastModule(ClimaX(default_vars), pretrained_path) 
+    mod = ModifiedGlobalForecastModule(ClimaX(default_vars, img_size=[128, 256], patch_size=4), pretrained_path) 
 
-    our_transforms = get_normalize()
+    our_transforms = get_normalize(default_vars)
     our_output_transforms = get_normalize(out_variables)
     
     normalization = our_output_transforms
     mean_norm, std_norm = normalization.mean, normalization.std
     mean_denorm, std_denorm = -mean_norm / std_norm, 1 / std_norm
     mod.set_denormalization(mean_denorm, std_denorm)
+
+
+    mean_norm2, std_norm2 = our_transforms.mean, our_transforms.std
+    mean_denorm2, std_denorm2 = -mean_norm2 / std_norm2, 1 / std_norm2
+    our_denorm = transforms.Normalize(mean_denorm2, std_denorm2)
     
     mod.set_lat_lon(*get_lat_lon())
-    mod.set_pred_range(1) #TODO - What is this? Is 1 okay? 
+    mod.set_pred_range(6) 
 
-    clim = get_climatology("test", out_variables) # TODO - is this in_variables or out_variables? 
+    clim = get_climatology("test", out_variables) 
     mod.set_test_clim(clim)
+
+    print("OUR TRANSFORMS", our_transforms)
 
     file_list = [npz_path]
     data_test = IndividualForecastDataIter(
@@ -310,7 +325,7 @@ def run(npz_path, lead_time, in_variables, out_variables, out_dir):
                             file_list=file_list,
                             start_idx=0,
                             end_idx=1,
-                            variables=in_variables,
+                            variables=default_vars,
                             out_variables=out_variables,
                             shuffle=False,
                             multi_dataset_training=False,
@@ -345,7 +360,7 @@ def run(npz_path, lead_time, in_variables, out_variables, out_dir):
         print(idx)
         idx += 1
         batch = batch
-        loss, output_json = mod.test_step(batch, idx)
+        loss, output_json = mod.test_step(batch, idx, our_denorm)
         final_json.append(append_to_json(output_json, file_list[0], 12))
 
         print(loss)
@@ -353,7 +368,7 @@ def run(npz_path, lead_time, in_variables, out_variables, out_dir):
 
     import json
     from time import time
-    with open(f"{out_dir}/final_invars_{len(in_variables)}_hrs_{(lead_time):04}.json", "w") as outfile:
+    with open(f"{out_dir}/final_invars_{len(default_vars)}_hrs_{(lead_time):04}.json", "w") as outfile:
         json.dump(final_json, outfile)
 
 
@@ -366,29 +381,81 @@ Currently seeing smoothness
 
 if __name__=='__main__': 
 
-    BASE_VARIABLES = ['2m_temperature']
-    #VARIABLES_TO_TRY = ['10m_u_component_of_wind', '10m_v_component_of_wind', 'geopotential_50', 'temperature_50', 'temperature_250']
-    VARIABLES_TO_TRY = ['temperature_50', 'temperature_250', 'temperature_500', 'temperature_600']
+    #NPZ_PATH = '/home/advit/test_new2/test/2017_0.npz'
+    NPZ_PATH = '/home/data/datasets/climate/era5/1.40625_npz/test/2017_0.npz'
+    data = np.load(NPZ_PATH)
 
-    DUMP_DIRECTORY = r"/home/advit/aug29_exps2"
-    NPZ_PATH = r"/home/advit/test_new2/test/2017_0.npz"
+    print("Arrays in the NPZ file:", data.files)
 
 
-    # Run ClimaX with each subset of variables
+    in_variables = [] 
+    # Access and print the contents of individual arrays
+    for array_name in data.files:
+        if array_name not in ['2m_temperature_extreme_mask', 'toa_incident_solar_radiation', 'total_precipitation', 'total_cloud_cover', ]:
+            if 'vorticity' not in array_name: 
+                in_variables.append(array_name)
 
-    for i in range(len(VARIABLES_TO_TRY)):
-        in_variables = BASE_VARIABLES + VARIABLES_TO_TRY[0:i]
-        out_variables = BASE_VARIABLES
+    print(f"Going to try: {len(in_variables)} input variables.")
 
-        #LEAD_TIMES = [6, 12, 18, 24, 30, 36, 42, 48]
-        LEAD_TIMES = [6] 
+    out_variables = ['2m_temperature']
+    out_directory = r"/home/advit/sep6_exps/"
 
-        print(f"Running experiment w/ in_vars: {in_variables}")
+    LEAD_TIMES = [6]
 
-        for time in LEAD_TIMES: 
-            print(f" - Lead Time: {time}")
-            run(npz_path=NPZ_PATH, lead_time=time, in_variables=in_variables, out_variables=out_variables, out_dir=DUMP_DIRECTORY)
+    for lead in LEAD_TIMES: 
+        run(npz_path=NPZ_PATH, lead_time=lead, in_variables=in_variables, out_variables=out_variables, out_dir=out_directory)
 
-        print(f"")
-    
-    
+
+
+
+    # BASE_VARIABLES = ['2m_temperature']
+    # NPZ_PATH = r"/home/advit/test_new2/test/2017_0.npz"
+
+    # """ Run #1 - W/ Temp Variables """
+
+
+    # VARIABLES_TO_TRY = ['10m_u_component_of_wind', '10m_v_component_of_wind', 'geopotential_50', 'vorticity_50', 'potential_vorticity_50']
+    # DUMP_DIRECTORY = r"/home/advit/aug30_exps/all_vars"
+
+
+    # data = np.load(NPZ_PATH)
+
+    # # Print the list of arrays stored in the NPZ file
+    # print("Arrays in the NPZ file:", data.files)
+
+    # in_variables = [] 
+    # # Access and print the contents of individual arrays
+    # for array_name in data.files:
+    #     if array_name not in ['2m_temperature_extreme_mask', 'toa_incident_solar_radiation', 'total_precipitation', 'total_cloud_cover', ]:
+    #         if 'vorticity' not in array_name: 
+    #             in_variables.append(array_name)
+
+
+
+    # #VARIABLES_TO_TRY = ['temperature_50', 'temperature_250', 'temperature_500', 'temperature_600', 'temperature_700', 'temperature_850', 'temperature_925']
+    # #DUMP_DIRECTORY = r"/home/advit/aug30_exps/all_temps"
+
+    # # Run ClimaX with each subset of variables
+
+    # #for i in range(len(VARIABLES_TO_TRY)):
+
+    # #in_variables = BASE_VARIABLES + VARIABLES_TO_TRY[0:i]
+    # out_variables = BASE_VARIABLES
+
+
+
+    # #in_variables = ['2m_temperature', '10m_u_component_of_wind', '10m_v_component_of_wind', 'geopotential_50', 'temperature_50', 'temperature_250', 'temperature_500', 'temperature_600', 'temperature_700', 'temperature_850', 'temperature_925']
+
+
+    # LEAD_TIMES = [6, 12, 18, 24, 30, 36, 42, 48] 
+
+    # print(f"Running experiment w/ in_vars: {in_variables}")
+
+    # for time in LEAD_TIMES: 
+    #     print(f" - Lead Time: {time}")
+    #     run(npz_path=NPZ_PATH, lead_time=time, in_variables=in_variables, out_variables=out_variables, out_dir=DUMP_DIRECTORY)
+
+    # print(f"")
+
+
+    # """ Run #2 - W/ Non-Temp variables """
