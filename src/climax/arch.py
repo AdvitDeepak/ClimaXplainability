@@ -266,7 +266,7 @@ class ClimaX(nn.Module):
         return loss, preds
 
     def evaluate(self, x, y, lead_times, variables, out_variables, transform, metrics, lat, clim, log_postfix, our_transforms):
-        print(f"(arch.py) Entered the evaluate function of the model")
+        # print(f"(arch.py) Entered the evaluate function of the model")
 
         _, preds = self.forward(x, y, lead_times, variables, out_variables, metric=None, lat=lat)
         # print(f"(arch.py) Received predictions, calling metrics now")
@@ -284,16 +284,17 @@ class ClimaX(nn.Module):
 
         # print(metric_dictionary)
 
-        print("Shapes")
-        print(x.shape)
-        print(y.shape)
-        print(preds.shape)
+        # print("Shapes")
+        # print(x.shape)
+        # print(y.shape)
+        # print(preds.shape)
 
-        out_var_ids = self.get_var_ids(tuple(out_variables), x.device)
-        x = x[:, out_var_ids]
+        # out_var_ids = self.get_var_ids(tuple(out_variables), x.device)
+        # print(out_var_ids)
+        # x = x[:, out_var_ids]
 
-        print("TRANSFORMED", x.shape)
-        print(transform)
+        # print("TRANSFORMED", x.shape)
+        # print(transform)
 
         json_results = {
             'input' : transform(x).cpu().numpy().tolist(), 
