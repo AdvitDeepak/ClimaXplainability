@@ -62,6 +62,7 @@ class ModifiedGlobalForecastModule(LightningModule):
             checkpoint = torch.load(pretrained_path, map_location=torch.device("cpu"))
         print("Loading pre-trained checkpoint from: %s" % pretrained_path)
         checkpoint_model = checkpoint["state_dict"]
+        #checkpoint_model = checkpoint # <-- THIS IS BECAUSE WE ALR SAVED THE DICT REMEMBER!
         # interpolate positional embedding
         interpolate_pos_embed(self.net, checkpoint_model, new_size=self.net.img_size)
 
@@ -244,6 +245,8 @@ def run(npz_path, lead_time, in_variables, out_variables, out_dir):
 
     #finetuned_checkpoint_6hr_leadtime = '/home/tungnd/climate-learn/results_rebuttal/climax_6/checkpoints/epoch_044.ckpt'
 
+    #pretrained_path = '/home/advit/finetuned_checkpoint_6hr_leadtime.pth'
+
     default_vars = [
         "land_sea_mask",
         "orography",
@@ -398,9 +401,9 @@ if __name__=='__main__':
     print(f"Going to try: {len(in_variables)} input variables.")
 
     out_variables = ['2m_temperature']
-    out_directory = r"/home/advit/sep6_exps/"
+    out_directory = r"/home/advit/sep7_exps/"
 
-    LEAD_TIMES = [6]
+    LEAD_TIMES = [6, 12, 18, 24, 30, 36, 48]
 
     for lead in LEAD_TIMES: 
         run(npz_path=NPZ_PATH, lead_time=lead, in_variables=in_variables, out_variables=out_variables, out_dir=out_directory)
