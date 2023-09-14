@@ -16,9 +16,14 @@ OR, select an existing directory containing run json files
 
 """
 
+import os 
+import json 
+import time 
 import datetime
 import streamlit as st 
+
 from const import SIDEBAR
+from help import find_json_files, report_new, generate_map 
 
 
 # The sidebar 
@@ -36,16 +41,20 @@ def colS():
     # Case 1) If turned off, we can load an existing directory + ONLY visualize results 
     if not st.session_state.state["selected_mode"]: 
 
-        st.session_state.state["run_json_dir"] = st.sidebar.text_input("Existing Run Directory Path (where are prediction logs stored?)", "/home/advit/sep12_exps")
-
-        st.sidebar.header("Existing Runs Detected")
-        st.session_state.state["selected_run"] = st.sidebar.selectbox("Select an existing run of those identified in Dir Path", ["Run 1", "Run 2", "Run 3"])
+        st.session_state.state["run_json_dir"] = st.sidebar.text_input("Existing Run Directory Path (where are prediction logs stored?)", SIDEBAR['defaults']['run_dir_path'])
+        run_json_files = find_json_files(st.session_state.state["run_json_dir"])
+        print(f"(colS.py) Found the following runs: {run_json_files}")
+        
+        st.sidebar.header("Existing Runs Detected:")
+        st.session_state.state["selected_run"] = st.sidebar.multiselect(f"Select existing run(s) of the {len(run_json_files)} identified in Dir Path", run_json_files, run_json_files)
 
 
     # Case 2) If left on (default), we input the parameters into ClimaX + Run and Visualize Results 
     else:  
 
         st.sidebar.caption("Paths for NPZ datasets, possible inputs, and possible outputs are specified in `streamlit/const.py`. Please modify as needed.")
+
+        # TODO - function that goes through folder specified in SIDEBAR['defaults']['run_dir_path'] and finds all .npz files and returns
 
         st.session_state.state["selected_npz"] = st.sidebar.selectbox("Select NPZ dataset", ["Dataset 1", "Dataset 2", "Dataset 3"])
 
@@ -81,7 +90,28 @@ def colS():
 
     # Run button to trigger model run
     if st.sidebar.button("Run ClimaXplainability 🌎", type="primary"):
-        # Add logic to trigger the model run and save results
-        st.sidebar.text("Model is running...")
+
+        # Case 1) ONLY Visualize Results
+        if not st.session_state.state["selected_mode"]: 
+            
+
+            with st.sidebar:
+                with st.spinner("Gathering selected `.json` files..."): 
+
+                    for run in st.session_state.state["selected_run"]: 
+                        print(f"(colS.py) Analyzing run: {run}")
+                        with open(os.path.join(st.session_state.state["run_json_dir"], run)) as f: 
+                            data = json.load(f)
+
+                        # TODO - currently does NOT average, only looks at the last one!
+                        st.session_state.state["run_df"], st.session_state.state["metrics_df"],= report_new(data)
+
+
+                with st.spinner("Parsing selected `.json` files..."): 
+                    st.session_state.state["plotly_truth"], st.session_state.state["plotly_pred"] = generate_map(st.session_state.state["run_json_dir"], st.session_state.state["selected_run"])
+
+
+        else: 
+            st.sidebar.text("Model is running...")
 
  
