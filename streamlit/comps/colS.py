@@ -56,10 +56,10 @@ def colS():
 
         # TODO - function that goes through folder specified in SIDEBAR['defaults']['run_dir_path'] and finds all .npz files and returns
 
-        st.session_state.state["selected_npz"] = st.sidebar.selectbox("Select NPZ dataset", ["Dataset 1", "Dataset 2", "Dataset 3"])
+        st.session_state.state["selected_npz"] = st.sidebar.selectbox("Select NPZ dataset", ["2017_0.npz", "2017_1.npz", "2017_2.npz"])
 
-        st.session_state.state["selected_inp_var"] = st.sidebar.multiselect("Select input variables", ["Var1", "Var2", "Var3"])
-        st.session_state.state["selected_out_var"] = st.sidebar.multiselect("Select output variables", ["VarA", "VarB", "VarC"])
+        st.session_state.state["selected_inp_var"] = st.sidebar.multiselect("Select input variables", ["2m_temperature", "temperature_50", "temperature_200"])
+        st.session_state.state["selected_out_var"] = st.sidebar.multiselect("Select output variables", ["2m_temperature", "temperature_50", "temperature_200"])
 
 
         """ Start Time Selection """ 

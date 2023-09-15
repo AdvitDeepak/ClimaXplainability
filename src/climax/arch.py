@@ -50,6 +50,17 @@ class ClimaX(nn.Module):
     ):
         super().__init__()
 
+        """
+        
+        TODO: look at original version of code (arch.py) that was using this last.ckpt 
+        Modify arch.py (ex variable vs channel)
+
+        https://github.com/tung-nd/climax_all/blob/main/src/models/components/tokenized_vit_continuous.py
+
+        Change parameter names to match 
+        
+        """
+
         # TODO: remove time_history parameter
         self.img_size = img_size
         self.patch_size = patch_size
@@ -76,6 +87,9 @@ class ClimaX(nn.Module):
         # positional embedding and lead time embedding
         self.pos_embed = nn.Parameter(torch.zeros(1, self.num_patches, embed_dim), requires_grad=True)
         self.lead_time_embed = nn.Linear(1, embed_dim)
+
+        self.time_pos_embed = nn.Parameter(torch.zeros(1, 1, embed_dim), requires_grad=True)
+
 
         # --------------------------------------------------------------------------
 
@@ -222,13 +236,22 @@ class ClimaX(nn.Module):
         # variable aggregation
         x = self.aggregate_variables(x)  # B, L, D
 
-        # add pos embedding
-        x = x + self.pos_embed
+        # added for last.ckpt
+        x = x.unflatten(0, sizes=(x.shape[0], 1))
+
+        # add pos embedding (unsqueeze added for last.ckpt)
+        x = x + self.pos_embed.unsqueeze(1)
+
+        # add time pos embedding (for last.ckpt)
+        x = x + self.time_pos_embed.unsqueeze(2)
+
 
         # add lead time embedding
         lead_time_emb = self.lead_time_embed(lead_times.unsqueeze(-1))  # B, D
-        lead_time_emb = lead_time_emb.unsqueeze(1)
+        lead_time_emb = lead_time_emb.unsqueeze(1).unsqueeze(2) # (added for last.ckpt)
         x = x + lead_time_emb  # B, L, D
+        # added to last.ckpt
+        x = x.flatten(1, 2)  # B, TxL, D
 
         x = self.pos_drop(x)
 
@@ -266,7 +289,7 @@ class ClimaX(nn.Module):
         return loss, preds
 
     def evaluate(self, x, y, lead_times, variables, out_variables, transform, metrics, lat, clim, log_postfix, our_transforms):
-        print(f"(arch.py) Entered the evaluate function of the model")
+        #print(f"(arch.py) Entered the evaluate function of the model")
 
         _, preds = self.forward(x, y, lead_times, variables, out_variables, metric=None, lat=lat)
         # print(f"(arch.py) Received predictions, calling metrics now")
@@ -284,16 +307,16 @@ class ClimaX(nn.Module):
 
         # print(metric_dictionary)
 
-        print("Shapes")
-        print(x.shape)
-        print(y.shape)
-        print(preds.shape)
+        # print("Shapes")
+        # print(x.shape)
+        # print(y.shape)
+        # print(preds.shape)
 
         out_var_ids = self.get_var_ids(tuple(out_variables), x.device)
         x = x[:, out_var_ids]
 
-        print("TRANSFORMED", x.shape)
-        print(transform)
+        #print("TRANSFORMED", x.shape)
+        #print(transform)
 
         json_results = {
             'input' : transform(x).cpu().numpy().tolist(), 

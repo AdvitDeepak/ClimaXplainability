@@ -155,7 +155,7 @@ def get_choro_fig(arr, arr2, min_range, max_range):
     for i in range(128):
         for j in range(256):
             for idx, a in enumerate(arr): 
-                temperature_arr.append({"Time" : idx, "Coords": coord_center_arr[counter], "Temp": a[i][j]})
+                temperature_arr.append({"Time (Hrs)" : idx*6, "Coords": coord_center_arr[counter], "Temp": a[i][j]})
             counter += 1    
 
     print("Made list of dictionaries...")
@@ -177,17 +177,17 @@ def get_choro_fig(arr, arr2, min_range, max_range):
         center={"lat": 0, "lon": 180},  # Center the map
         zoom=0,  # Adjust the initial zoom level
         labels={'Temp' : 'Temp (K)'}, 
-        animation_frame='Time',
+        animation_frame='Time (Hrs)',
     )
-
+    print("Made intiial fig...")
     fig.update_traces(marker_line_width=0)  
     fig.update_layout(transition = {'duration': 2000})
     fig.layout.updatemenus[0].buttons[0].args[1]["frame"]["duration"] = 2000
     fig.update_layout(
         margin={"r":0,"t":0,"l":0,"b":0}, 
-        height=300
+        height=500
     )
-
+    print("Returning fig now")
     return fig 
 
 
@@ -212,6 +212,10 @@ def generate_map(dir, jsons):
 
     min_range = min([np.amin(truth_arr)]) 
     max_range = max([np.amax(truth_arr)]) 
+
+    min_range = np.amin(preds_arr)
+    max_range = np.amax(truth_arr)
+
     scale = (min_range, max_range)
 
     print(f"(generate_map) Scale: {scale}")
@@ -232,7 +236,9 @@ def generate_map(dir, jsons):
         preds_arr[i] = np.roll(preds, preds.shape[1] // 2, axis=0)
 
     print(f"(generate_map) Calling fig gen func...")
-    fig1 = get_choro_fig(truth_arr, preds_arr, min_range, max_range)
+    #fig1 = get_choro_fig(truth_arr, preds_arr, min_range, max_range)
     fig2 = get_choro_fig(preds_arr, truth_arr, min_range, max_range)
 
-    return fig1, fig2
+    return None, fig2 
+
+    return #fig1, fig2
