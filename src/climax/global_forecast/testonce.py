@@ -26,6 +26,7 @@ import os
 from pytorch_lightning import LightningModule
 
 import json
+import glob 
 from time import time
 
 #from climax.climate_learn.src import *
@@ -387,15 +388,25 @@ def run(npz_path, lead_time, in_variables, out_variables, out_dir, num_shards, i
     mean_denorm2, std_denorm2 = -mean_norm2 / std_norm2, 1 / std_norm2
     our_denorm = transforms.Normalize(mean_denorm2, std_denorm2)
 
+    # We want to do two-week out predictions (so given a day, itll go 2 * 7 * 24 = 336 hr predictions)
+
     mod.set_lat_lon(*get_lat_lon())
-    mod.set_pred_range(6)
+    mod.set_pred_range(168) # Set to 6 later!  
+
 
     clim = get_climatology("test", out_variables)
     mod.set_test_clim(clim)
 
     #print("OUR TRANSFORMS", our_transforms)
 
-    file_list = [npz_path]
+    if isinstance(npz_path, list): 
+        file_list = npz_path # npz_path is ALREADY a list of npz files! 
+    else: 
+        file_list = [npz_path]
+
+
+    print("Have set the file_list to:", file_list)
+
     data_test = IndividualForecastDataIter(
                     Forecast(
                         NpyReader(
@@ -416,39 +427,46 @@ def run(npz_path, lead_time, in_variables, out_variables, out_dir, num_shards, i
                     output_transforms=our_output_transforms,
                 )
 
-
+    # ISSUE IS WE'RE DOING EACH BATCH (maybe?)
     X = DataLoader(
                 data_test,
-                batch_size=1,
+                batch_size=1, # used to be 1
                 shuffle=False,
                 drop_last=False,
-                num_workers=1,
+                num_workers=1, # used to be 1 
                 pin_memory=False,
                 collate_fn=collate_fn,
             )
 
     loss = ""
-    j = 0
-    batch = None
-
+    j = 0 
+    batch = None 
+    print("About to go through the for loop")
     final_json = []
-
-    for batch in X:
-        #print(j)
+    #print("Gonna go thru each batch in X")
+    for batch in X: 
+        print(j)  
+        # Can keep it 12 .. i think? 
         if j % 12 != 0:
             j += 1
             continue
-        print(f"  - Hour: {j}")
+
+        print(f"Prediction at: Hour: {j}, Day: {j/24}, Week: {j/168}")
         j += 1
         batch = batch
         loss, output_json = mod.test_step(batch, idx, our_denorm)
         final_json.append(append_to_json(output_json, file_list[0], num_shards))
-        print(loss)
+        print(f"  - Result at: {loss}")
 
-        if j == steps: break # Run only those many (default: -1)
+        if j == steps: 
+            print("Breaking since steps are equal")
+            break # Run only those many (default: -1)
 
     with open(f"{out_dir}/shard_{idx}_hrs_{(lead_time):04}.json", "w") as outfile:
         json.dump(final_json, outfile)
+
+    print(f"  - Successfully dumped file w/ j = {j}")
+                 
 
 
 """
@@ -487,9 +505,9 @@ if __name__=='__main__':
     NPZ_DIR = '/localhome/data/datasets/climate/era5/1.40625_npz/test'
 
     out_variables = ['2m_temperature']
-    out_directory = r"/localhome/advit/sep15_exps2/"
+    out_directory = r"/localhome/advit/sep19_exps"
 
-    LEAD_TIME = 6 
+    LEAD_TIME = 7 * 24 # Two week out predictions
 
     # Go thru each npz file
 
@@ -498,8 +516,23 @@ if __name__=='__main__':
     for idx, file in enumerate(os.listdir(NPZ_DIR)):
         print(f"Using file: {file}")
 
+        if "2017" in file and "31" not in file: 
+            print(f" - Skipping...")
+            continue 
+
         npz_path = os.path.join(NPZ_DIR, file)
+        run(npz_path=npz_path, lead_time=LEAD_TIME, in_variables=None, out_variables=out_variables, out_dir=out_directory, num_shards=num_shards, idx=idx, steps=-1)
 
-        run(npz_path=npz_path, lead_time=LEAD_TIME, in_variables=None, out_variables=out_variables, out_dir=out_directory, num_shards=num_shards, idx=idx, steps=1)
+        #break # Only use 2017_0.npz (the first NPZ file)
 
-        break # Only use 2017_0.npz (the first NPZ file)
+    # all_files = glob.glob(os.path.join(NPZ_DIR, '*'))
+    # files_with_2018 = [file for file in all_files if '2018' in os.path.basename(file)]
+    # files_with_2018 = ['/localhome/data/datasets/climate/era5/1.40625_npz/test/2017_31.npz'] + files_with_2018
+
+    # num_shards = 0 # DUMMY VAR 
+    # print("Calling run function")
+    # run(npz_path=files_with_2018, lead_time=LEAD_TIME, in_variables=None, out_variables=out_variables, out_dir=out_directory, num_shards=num_shards, idx=0, steps=1)
+
+    # TODO: rerun w/out relative humidity (ALL LEVELS)
+    # TODO: try two weeks out (worst case one week on 2017)
+
