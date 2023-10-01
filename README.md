@@ -8,11 +8,7 @@
 
 # ClimaXplainability - Explainability Experiments on ClimaX 
 
-This repo is split into three branches, one for each model: 
-
-* `main` : ClimaX model found on Huggingface (1.4 degrees)
-* `last.cpkt` : ClimaX model finetuned on ERA5 for 6hr Lead Times (1.4 degrees)
-* `climate+x` : Tung's new and improved model (*recently submitted to ICLR*)
+> More info coming soon! 
 
 ## More About ClimaX 
 
