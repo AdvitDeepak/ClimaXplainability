@@ -25,6 +25,9 @@ import numpy as np
 import os
 from pytorch_lightning import LightningModule
 
+import json
+from time import time
+
 #from climax.climate_learn.src import *
 
 from datetime import datetime, timedelta
@@ -120,6 +123,7 @@ class ModifiedGlobalForecastModule(LightningModule):
             checkpoint = torch.load(pretrained_path, map_location=torch.device("cpu"))
         # print("Loading pre-trained checkpoint from: %s" % pretrained_path)
         checkpoint_model = checkpoint["state_dict"]
+        #checkpoint_model = checkpoint # <-- THIS IS BECAUSE WE ALR SAVED THE DICT REMEMBER!
         # interpolate positional embedding
         interpolate_pos_embed(self.net, checkpoint_model, new_size=self.net.img_size)
 
@@ -130,7 +134,7 @@ class ModifiedGlobalForecastModule(LightningModule):
                     "Pretrained checkpoint does not have token_embeds.proj_weights for parallel processing. Please convert the checkpoints first or disable parallel patch_embed tokenization."
                 )
 
-        # checkpoint_keys = list(checkpoint_model.keys())
+        checkpoint_keys = list(checkpoint_model.keys())
         for k in list(checkpoint_model.keys()):
             if "channel" in k:
                 checkpoint_model[k.replace("channel", "var")] = checkpoint_model[k]
@@ -158,15 +162,15 @@ class ModifiedGlobalForecastModule(LightningModule):
         self.test_clim = clim
 
     def test_step(self, batch: Any, batch_idx: int, our_transforms: Any):
-        # print(f"(testonce.py) Entered test_step function w/ batch_idx {batch_idx}\n\n")
+        #print(f"(testonce.py) Entered test_step function w/ batch_idx {batch_idx}\n\n")
         x, y, lead_times, variables, out_variables = batch
-        # print(np.amin(x.cpu().numpy()))
-        # print(np.amax(x.cpu().numpy()))
-        # print("(testonce.py) X", x)
-        # print("(testonce.py) Y", y)
-        # print("(testonce.py) LEAD", lead_times)
-        # print("(testonce.py) IN VARS", variables)
-        # print("(testonce.py) OUT VARS", out_variables)
+        #print(np.amin(x.cpu().numpy()))
+        #print(np.amax(x.cpu().numpy()))
+        #print("(testonce.py) X", x)
+        #print("(testonce.py) Y", y)
+        #print("(testonce.py) LEAD", lead_times)
+        #print("(testonce.py) IN VARS", variables)
+        #print("(testonce.py) OUT VARS", out_variables)
 
 
         self.pred_range = 1
@@ -178,7 +182,7 @@ class ModifiedGlobalForecastModule(LightningModule):
             log_postfix = f"{days}_days"
 
 
-        # print(f"\n\n(module.py) About to call self.net.evaluate() function")
+        #print(f"\n\n(module.py) About to call self.net.evaluate() function")
         all_loss_dicts, json = self.net.evaluate(
             x=x,
             y=y,
@@ -307,8 +311,70 @@ def run(npz_path, lead_time, in_variables, out_variables, out_dir, resolution = 
     else:
         raise Exception('INVALID ARGUMENT FOR RESOLUTION')
 
+def run(npz_path, lead_time, in_variables, out_variables, out_dir, num_shards, idx, steps=-1):
+    #pretrained_path = 'https://huggingface.co/microsoft/climax/resolve/main/1.40625deg.ckpt'
 
-    our_transforms = get_normalize(in_variables)
+    #pretrained_path = '/localhome/tungnd/climate-learn/results_rebuttal/climax_6/checkpoints/epoch_044.ckpt'
+    #pretrained_path = '/localhome/advit/tung_checkpoint.pt'
+
+    # pretrained_path = '/home/prateiksinha/ClimaX/checkpoints/tung_checkpoint.pt'
+
+    pretrained_path = '/localhome/advit/last.ckpt'
+
+    default_vars = [
+        "land_sea_mask",
+        "orography",
+        "lattitude",
+        "2m_temperature",
+        "10m_u_component_of_wind",
+        "10m_v_component_of_wind",
+        "geopotential_50",
+        "geopotential_250",
+        "geopotential_500",
+        "geopotential_600",
+        "geopotential_700",
+        "geopotential_850",
+        "geopotential_925",
+        "u_component_of_wind_50",
+        "u_component_of_wind_250",
+        "u_component_of_wind_500",
+        "u_component_of_wind_600",
+        "u_component_of_wind_700",
+        "u_component_of_wind_850",
+        "u_component_of_wind_925",
+        "v_component_of_wind_50",
+        "v_component_of_wind_250",
+        "v_component_of_wind_500",
+        "v_component_of_wind_600",
+        "v_component_of_wind_700",
+        "v_component_of_wind_850",
+        "v_component_of_wind_925",
+        "temperature_50",
+        "temperature_250",
+        "temperature_500",
+        "temperature_600",
+        "temperature_700",
+        "temperature_850",
+        "temperature_925",
+        "relative_humidity_50",
+        "relative_humidity_250",
+        "relative_humidity_500",
+        "relative_humidity_600",
+        "relative_humidity_700",
+        "relative_humidity_850",
+        "relative_humidity_925",
+        "specific_humidity_50",
+        "specific_humidity_250",
+        "specific_humidity_500",
+        "specific_humidity_600",
+        "specific_humidity_700",
+        "specific_humidity_850",
+        "specific_humidity_925",
+        ]
+
+    mod = ModifiedGlobalForecastModule(ClimaX(default_vars, img_size=[128, 256], patch_size=4), pretrained_path)
+
+    our_transforms = get_normalize(default_vars)
     our_output_transforms = get_normalize(out_variables)
 
     normalization = our_output_transforms
@@ -327,7 +393,7 @@ def run(npz_path, lead_time, in_variables, out_variables, out_dir, resolution = 
     clim = get_climatology("test", out_variables)
     mod.set_test_clim(clim)
 
-    # print("OUR TRANSFORMS", our_transforms)
+    #print("OUR TRANSFORMS", our_transforms)
 
     file_list = [npz_path]
     data_test = IndividualForecastDataIter(
@@ -362,25 +428,35 @@ def run(npz_path, lead_time, in_variables, out_variables, out_dir, resolution = 
             )
 
     loss = ""
-    idx = 0
+    j = 0
     batch = None
 
     final_json = []
-    # first = True
+
     for batch in X:
-        # print(idx)
-        idx += 1
+        #print(j)
+        if j % 12 != 0:
+            j += 1
+            continue
+        print(f"  - Hour: {j}")
+        j += 1
         batch = batch
         loss, output_json = mod.test_step(batch, idx, our_denorm)
-        final_json.append(append_to_json(output_json, file_list[0], 12))
+        final_json.append(append_to_json(output_json, file_list[0], num_shards))
+        print(loss)
 
-        # print(loss)
-        break
+        if j == steps: break # Run only those many (default: -1)
 
-    import json
-    from time import time
-    with open(f"{out_dir}/final_invars_{'-'.join([var[0] + var.split('_')[-1] for var in in_variables[:-1]])}_hrs_{(lead_time):04}.json", "w") as outfile:
+    with open(f"{out_dir}/shard_{idx}_hrs_{(lead_time):04}.json", "w") as outfile:
         json.dump(final_json, outfile)
+
+
+"""
+
+The main testing script.
+Currently seeing smoothness
+
+"""
 
 def get_variables(initial_condition_path):
     """
@@ -405,33 +481,25 @@ def process_input_variables(input_variables):
         raise Exception('ONE OR MORE DESIRED INPUTS ARE NOT IN THE FILE')
     return [input_variables_to_use]
 
-
 if __name__=='__main__':
-    """
-
-    The main testing script.
-    Currently seeing smoothness
-
-    """
-    initial_condition_path = '/localhome/data/datasets/climate/era5/1.40625_npz/test/2017_0.npz'
-    output_variables = ['2m_temperature']
-    input_variables = output_variables + [] # enter desired input variables into this list
-    output_directory = r"/home/prateiksinha/ClimaX/output"
-
-
-    input_variables = process_input_variables(input_variables)
-    lead_times = [48]
-
     print(welcome_message)
-    for lead_time in lead_times:
-        for inp in input_variables:
-            print(f"Running w/\ninput  = {inp}\noutput = {output_variables}\n...")
-            run(
-                npz_path = initial_condition_path,
-                lead_time = lead_time,
-                in_variables = inp,
-                out_variables = output_variables,
-                out_dir = output_directory,
-                resolution = 'high'
-            )
-            print(f'Completed! :D')
+
+    NPZ_DIR = '/localhome/data/datasets/climate/era5/1.40625_npz/test'
+
+    out_variables = ['2m_temperature']
+    out_directory = r"/localhome/advit/sep15_exps2/"
+
+    LEAD_TIME = 6 
+
+    # Go thru each npz file
+
+    num_shards = len(os.listdir(NPZ_DIR))
+
+    for idx, file in enumerate(os.listdir(NPZ_DIR)):
+        print(f"Using file: {file}")
+
+        npz_path = os.path.join(NPZ_DIR, file)
+
+        run(npz_path=npz_path, lead_time=LEAD_TIME, in_variables=None, out_variables=out_variables, out_dir=out_directory, num_shards=num_shards, idx=idx, steps=1)
+
+        break # Only use 2017_0.npz (the first NPZ file)

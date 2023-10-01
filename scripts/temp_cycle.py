@@ -7,16 +7,16 @@ import matplotlib.pyplot as plt
 from scipy.interpolate import make_interp_spline
 
 
-DIR = 'output_jsons'
+DIR = '/home/advit/sep7_exps/all_vars'
 
 # Get a list of JSON files in alphabetical order
 json_files = sorted([f for f in os.listdir(DIR) if f.endswith('.json')])
 pattern = r'(\d+)\.json'
 
-STOP_AT = 94
+#STOP_AT = 94
 
-LA_LAT = 21
-LA_LONG = 42
+#LA_LAT = 21
+#LA_LONG = 42
 
 
 # LA_LAT = 19
@@ -43,9 +43,9 @@ for json_file in json_files:
         match = re.search(pattern, json_file)
         if match:
             int_match = int(match.group(1)) 
-            if int_match > STOP_AT: 
-                 print(f"Breaking")
-                 break 
+            # if int_match > STOP_AT: 
+            #      print(f"Breaking")
+            #      break 
             
             numerical_part = match.group(1)
             data = data[0]
@@ -74,7 +74,7 @@ hours = np.arange(1, len(output_la) + 1)
 
 plt.figure(figsize=(14, 6))
 plt.plot(hours, np.array(pred_la), marker='o', linestyle='-', color='b', label='Temperature ClimaX Prediction')
-plt.plot(hours, np.array(output_la), marker='s', linestyle='-', color='r', label='Temperature AWI Truth')
+plt.plot(hours, np.array(output_la), marker='s', linestyle='-', color='r', label='Temperature Truth')
 #plt.plot(hours, np.array(input_la), marker='^', linestyle='-', color='g', label='Temperature AWI Base')
 
 # climax_interp = make_interp_spline(hours, np.array(pred_la), k=3)  # Cubic spline interpolation
@@ -95,3 +95,4 @@ plt.title('(Kwajalein, Marshall Islands) Temperature Vs. Hour - ClimaX, AWI Trut
 plt.grid(True)
 plt.legend()
 plt.show()
+print("SHOWING THIS PLOT")

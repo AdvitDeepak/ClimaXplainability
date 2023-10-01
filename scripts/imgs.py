@@ -12,16 +12,18 @@ import numpy as np
 from tabulate import tabulate
 
 
-DIR = '/home/advit/aug30_exps/all_vars'
-OUT_PRED = '/home/advit/aug30_exps/all_vars/pred_kelvin'
-OUT_TRUTH = '/home/advit/aug30_exps/all_vars/truth'
+DIR = '/home/advit/sep7_exps/all_vars'
+OUT_PRED = '/home/advit/sep7_exps/all_vars/pred'
+OUT_TRUTH = '/home/advit/sep7_exps/all_vars/truth'
 
 #VARIABLES_TO_TRY = ['temp_50', 'temp_250', 'temp_500', 'temp_600', 'temp_700', 'temp_850', 'temp_925']
 #VARIABLES_TO_TRY = ['2m_temp', '10m_u__wind', '10m_v_wind', 'geo_50']
 
 
-def plot(data, title, d_type, scale):
-        temperature = data
+def plot(data, title, d_type, scale=None):
+        #temperature = data
+        temperature = np.roll(data, data.shape[1] // 2, axis=1)
+
         fig = plt.figure(figsize=(20,9))
         map = Basemap(projection='cyl', resolution = 'i', area_thresh = 0.3, llcrnrlon=-180, llcrnrlat=-90, urcrnrlon=180, urcrnrlat=90.0, anchor = 'SW')
         map.drawcoastlines()
@@ -29,6 +31,7 @@ def plot(data, title, d_type, scale):
         map.drawparallels(np.arange(-90,90,15.0),labels=[1,1,0,1])
         map.drawmeridians(np.arange(-180,180,15),labels=[1,1,0,1])
 
+        # temperature2 = upscale(temperature, fig)
         heatmap = plt.pcolormesh(
             np.linspace(-180, 180, num = temperature.shape[1]+1),
             np.linspace(-90, 90, num = temperature.shape[0]+1),
@@ -38,20 +41,58 @@ def plot(data, title, d_type, scale):
             vmin = scale[0],
             vmax = scale[1]
         )
-
+        # heatmap = plt.pcolormesh(
+        #     np.linspace(-180, 180, num = temperature.shape[1]),
+        #     np.linspace(-90, 90, num = temperature.shape[0]),
+        #     temperature, 
+        #     cmap='bwr',
+        #     shading='nearest'
+        # )
         map.colorbar(heatmap, pad=1)
         plt.title(title, 
             {
                 'fontsize' : 30
             }
         )
-        #fig.show()
         if d_type == "pred": 
             plt.savefig(os.path.join(OUT_PRED, title))
         elif d_type == "truth":
             plt.savefig(os.path.join(OUT_TRUTH, title))
         
         plt.close() 
+
+# def plot(data, title, d_type, scale):
+#         temperature = data
+#         fig = plt.figure(figsize=(20,9))
+#         map = Basemap(projection='cyl', resolution = 'i', area_thresh = 0.3, llcrnrlon=-180, llcrnrlat=-90, urcrnrlon=180, urcrnrlat=90.0, anchor = 'SW')
+#         map.drawcoastlines()
+#         map.drawcountries()
+#         map.drawparallels(np.arange(-90,90,15.0),labels=[1,1,0,1])
+#         map.drawmeridians(np.arange(-180,180,15),labels=[1,1,0,1])
+
+#         heatmap = plt.pcolormesh(
+#             np.linspace(-180, 180, num = temperature.shape[1]+1),
+#             np.linspace(-90, 90, num = temperature.shape[0]+1),
+#             temperature, 
+#             cmap='bwr',
+#             shading='flat',
+#             vmin = scale[0],
+#             vmax = scale[1]
+#         )
+
+#         map.colorbar(heatmap, pad=1)
+#         plt.title(title, 
+#             {
+#                 'fontsize' : 30
+#             }
+#         )
+#         #fig.show()
+#         if d_type == "pred": 
+#             plt.savefig(os.path.join(OUT_PRED, title))
+#         elif d_type == "truth":
+#             plt.savefig(os.path.join(OUT_TRUTH, title))
+        
+#         plt.close() 
  
         
 
@@ -82,11 +123,13 @@ for json_file in json_files:
         output = np.array(data['output']).squeeze()
         prediction = np.array(data['prediction']).squeeze()
 
-        fig_title = f"pred_at_{hrs_number}_hrs"
-        min_range = min([np.amin(prediction), np.amin(output)]) 
-        max_range = max([np.amax(prediction), np.amax(output)]) 
+        fig_title = f"pred_{invars_number}_invars_at_{hrs_number}_hrs"
+        #min_range = min([np.amin(prediction), np.amin(output), -80+273]) 
+        #max_range = max([np.amax(prediction), np.amax(output), 60+273]) 
+        min_range = min([np.amin(prediction), np.amin(output), 210]) 
+        max_range = max([np.amax(prediction), np.amax(output), 320]) 
         scale = (min_range, max_range)
         plot(prediction, fig_title, "pred", scale)
-        #plot(output, f"truth_{numerical_part}_hrs", "truth") 
+        plot(output, f"truth_at_{hrs_number}_hrs", "truth", scale) 
 
        
