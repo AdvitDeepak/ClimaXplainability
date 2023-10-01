@@ -51,14 +51,14 @@ class ClimaX(nn.Module):
         super().__init__()
 
         """
-        
-        TODO: look at original version of code (arch.py) that was using this last.ckpt 
+
+        TODO: look at original version of code (arch.py) that was using this last.ckpt
         Modify arch.py (ex variable vs channel)
 
         https://github.com/tung-nd/climax_all/blob/main/src/models/components/tokenized_vit_continuous.py
 
-        Change parameter names to match 
-        
+        Change parameter names to match
+
         """
 
         # TODO: remove time_history parameter
@@ -312,16 +312,17 @@ class ClimaX(nn.Module):
         # print(y.shape)
         # print(preds.shape)
 
-        out_var_ids = self.get_var_ids(tuple(out_variables), x.device)
-        x = x[:, out_var_ids]
+        # out_var_ids = self.get_var_ids(tuple(out_variables), x.device)
+        # print(out_var_ids)
+        # x = x[:, out_var_ids]
 
         #print("TRANSFORMED", x.shape)
         #print(transform)
 
         json_results = {
-            'input' : transform(x).cpu().numpy().tolist(), 
-            'output' : transform(y).cpu().numpy().tolist(), 
-            'prediction' : transform(preds).detach().numpy().tolist(), 
+            'input' : transform(x).cpu().numpy().tolist(),
+            'output' : transform(y).cpu().numpy().tolist(),
+            'prediction' : transform(preds).detach().numpy().tolist(),
             'variables': variables,
             'out_variables': out_variables,
             'lead_times': lead_times.item(),

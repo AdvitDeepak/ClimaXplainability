@@ -1,6 +1,6 @@
 from torchvision.transforms import transforms
 from typing import Any
-import torch 
+import torch
 from torch.utils.data import DataLoader, IterableDataset
 
 from climax.arch import ClimaX
@@ -21,23 +21,81 @@ from climax.pretrain.dataset import (
     ShuffleIterableDataset,
 )
 
-import numpy as np 
-import os 
+import numpy as np
+import os
 from pytorch_lightning import LightningModule
 
 import json
 import glob 
 from time import time
 
-#from climax.climate_learn.src import * 
+#from climax.climate_learn.src import *
 
 from datetime import datetime, timedelta
+
+#open text file in read mode
+text_file = open("/home/prateiksinha/ClimaX/welcome_message.txt", "r")
+#read whole file to a string
+welcome_message = text_file.read()
+#close file
+text_file.close()
+
 
 # ROOT_DIR = "/home/advit/ClimateData/processed_new/AWI"
 # ROOT_DIR = "/home/prateiksinha/new_data/processed/awi"
 ROOT_DIR = "/localhome/data/datasets/climate/era5/1.40625_npz/"
+default_vars = [
+    "land_sea_mask",
+    "orography",
+    "lattitude",
+    "2m_temperature",
+    "10m_u_component_of_wind",
+    "10m_v_component_of_wind",
+    "geopotential_50",
+    "geopotential_250",
+    "geopotential_500",
+    "geopotential_600",
+    "geopotential_700",
+    "geopotential_850",
+    "geopotential_925",
+    "u_component_of_wind_50",
+    "u_component_of_wind_250",
+    "u_component_of_wind_500",
+    "u_component_of_wind_600",
+    "u_component_of_wind_700",
+    "u_component_of_wind_850",
+    "u_component_of_wind_925",
+    "v_component_of_wind_50",
+    "v_component_of_wind_250",
+    "v_component_of_wind_500",
+    "v_component_of_wind_600",
+    "v_component_of_wind_700",
+    "v_component_of_wind_850",
+    "v_component_of_wind_925",
+    "temperature_50",
+    "temperature_250",
+    "temperature_500",
+    "temperature_600",
+    "temperature_700",
+    "temperature_850",
+    "temperature_925",
+    "relative_humidity_50",
+    "relative_humidity_250",
+    "relative_humidity_500",
+    "relative_humidity_600",
+    "relative_humidity_700",
+    "relative_humidity_850",
+    "relative_humidity_925",
+    "specific_humidity_50",
+    "specific_humidity_250",
+    "specific_humidity_500",
+    "specific_humidity_600",
+    "specific_humidity_700",
+    "specific_humidity_850",
+    "specific_humidity_925",
+    ]
 
-class ModifiedGlobalForecastModule(LightningModule): 
+class ModifiedGlobalForecastModule(LightningModule):
 
     def __init__(
         self,
@@ -64,7 +122,7 @@ class ModifiedGlobalForecastModule(LightningModule):
             checkpoint = torch.hub.load_state_dict_from_url(pretrained_path)
         else:
             checkpoint = torch.load(pretrained_path, map_location=torch.device("cpu"))
-        print("Loading pre-trained checkpoint from: %s" % pretrained_path)
+        # print("Loading pre-trained checkpoint from: %s" % pretrained_path)
         checkpoint_model = checkpoint["state_dict"]
         #checkpoint_model = checkpoint # <-- THIS IS BECAUSE WE ALR SAVED THE DICT REMEMBER!
         # interpolate positional embedding
@@ -89,7 +147,7 @@ class ModifiedGlobalForecastModule(LightningModule):
 
         # load pre-trained model
         msg = self.load_state_dict(checkpoint_model, strict=False)
-        print(msg)
+        # print(msg)
 
     def set_denormalization(self, mean, std):
         self.denormalization = transforms.Normalize(mean, std)
@@ -124,7 +182,7 @@ class ModifiedGlobalForecastModule(LightningModule):
             days = int(self.pred_range / 24)
             log_postfix = f"{days}_days"
 
-        
+
         #print(f"\n\n(module.py) About to call self.net.evaluate() function")
         all_loss_dicts, json = self.net.evaluate(
             x=x,
@@ -145,7 +203,7 @@ class ModifiedGlobalForecastModule(LightningModule):
             for k in d.keys():
                 loss_dict[k] = d[k]
         return loss_dict, json
-    
+
 
     def configure_optimizers(self):
         decay = []
@@ -219,7 +277,7 @@ def days_in_year(year=datetime.now().year):
     return 365 + calendar.isleap(int(year))
 
 def year_to_days_since_1850(year = None, partition = None, partitions_per_year = 12):
-    
+
     reference_date = datetime(1850, 1, 1, 0, 0, 0)
     new_date = datetime(int(year), 1, 1, 0, 0, 0)
     year_in_days = (new_date - reference_date).days
@@ -236,17 +294,28 @@ def append_to_json(j, file_name, partitions_per_year):
     return j
 
 
-"""
+def run(npz_path, lead_time, in_variables, out_variables, out_dir, resolution = "high"):
+    """
 
-The heart of our testonce.py script, the run() method. 
+    The heart of our testonce.py script, the run() method.
 
-"""
+    """
+    # pretrained_path = 'https://huggingface.co/tungnd/climax/resolve/main/5.625deg.ckpt'
+    pretrained_path = 'https://huggingface.co/microsoft/climax/resolve/main/1.40625deg.ckpt'
+    # pretrained_path = '/home/tungnd/climate-learn/results_rebuttal/climax_6/checkpoints/epoch_044.ckpt'
+    # pretrained_path = '/home/prateiksinha/ClimaX/checkpoints/tung_checkpoint.pt'
 
+    if resolution == 'high':
+        mod = ModifiedGlobalForecastModule(ClimaX(default_vars, img_size=[128, 256], patch_size=4), pretrained_path)
+    elif resolution == 'low':
+        mod = ModifiedGlobalForecastModule(ClimaX(default_vars, img_size=[32, 64], patch_size=2), pretrained_path)
+    else:
+        raise Exception('INVALID ARGUMENT FOR RESOLUTION')
 
 def run(npz_path, lead_time, in_variables, out_variables, out_dir, num_shards, idx, steps=-1):
     #pretrained_path = 'https://huggingface.co/microsoft/climax/resolve/main/1.40625deg.ckpt'
 
-    #pretrained_path = '/localhome/tungnd/climate-learn/results_rebuttal/climax_6/checkpoints/epoch_044.ckpt' 
+    #pretrained_path = '/localhome/tungnd/climate-learn/results_rebuttal/climax_6/checkpoints/epoch_044.ckpt'
     #pretrained_path = '/localhome/advit/tung_checkpoint.pt'
 
     # pretrained_path = '/home/prateiksinha/ClimaX/checkpoints/tung_checkpoint.pt'
@@ -304,11 +373,11 @@ def run(npz_path, lead_time, in_variables, out_variables, out_dir, num_shards, i
         "specific_humidity_925",
         ]
 
-    mod = ModifiedGlobalForecastModule(ClimaX(default_vars, img_size=[128, 256], patch_size=4), pretrained_path) 
+    mod = ModifiedGlobalForecastModule(ClimaX(default_vars, img_size=[128, 256], patch_size=4), pretrained_path)
 
     our_transforms = get_normalize(default_vars)
     our_output_transforms = get_normalize(out_variables)
-    
+
     normalization = our_output_transforms
     mean_norm, std_norm = normalization.mean, normalization.std
     mean_denorm, std_denorm = -mean_norm / std_norm, 1 / std_norm
@@ -318,13 +387,14 @@ def run(npz_path, lead_time, in_variables, out_variables, out_dir, num_shards, i
     mean_norm2, std_norm2 = our_transforms.mean, our_transforms.std
     mean_denorm2, std_denorm2 = -mean_norm2 / std_norm2, 1 / std_norm2
     our_denorm = transforms.Normalize(mean_denorm2, std_denorm2)
-    
+
     # We want to do two-week out predictions (so given a day, itll go 2 * 7 * 24 = 336 hr predictions)
 
     mod.set_lat_lon(*get_lat_lon())
     mod.set_pred_range(168) # Set to 6 later!  
 
-    clim = get_climatology("test", out_variables) 
+
+    clim = get_climatology("test", out_variables)
     mod.set_test_clim(clim)
 
     #print("OUR TRANSFORMS", our_transforms)
@@ -343,7 +413,7 @@ def run(npz_path, lead_time, in_variables, out_variables, out_dir, num_shards, i
                             file_list=file_list,
                             start_idx=0,
                             end_idx=1,
-                            variables=default_vars,
+                            variables=in_variables,
                             out_variables=out_variables,
                             shuffle=False,
                             multi_dataset_training=False,
@@ -378,7 +448,7 @@ def run(npz_path, lead_time, in_variables, out_variables, out_dir, num_shards, i
         print(j)  
         # Can keep it 12 .. i think? 
         if j % 12 != 0:
-            j += 1 
+            j += 1
             continue
 
         print(f"Prediction at: Hour: {j}, Day: {j/24}, Week: {j/168}")
@@ -401,12 +471,36 @@ def run(npz_path, lead_time, in_variables, out_variables, out_dir, num_shards, i
 
 """
 
-The main testing script. 
-Currently seeing smoothness 
+The main testing script.
+Currently seeing smoothness
 
 """
 
-if __name__=='__main__': 
+def get_variables(initial_condition_path):
+    """
+    Given the path to a .npz file containing the initial conditions, returns the variables contained inside
+    """
+    data = np.load(initial_condition_path)
+    variables = []
+    # Access and print the contents of individual arrays
+    for array_name in data.files:
+        if array_name not in ['2m_temperature_extreme_mask', 'toa_incident_solar_radiation', 'total_precipitation', 'total_cloud_cover', ]:
+            if 'vorticity' not in array_name:
+                variables.append(array_name)
+    return variables
+
+def process_input_variables(input_variables):
+    """
+    Given the list of desired input variables, checks if they are in the input file and returns them, preserving the order in default_vars
+    """
+    all_possible_input_variables = [v for v in default_vars[3:] if v in get_variables(initial_condition_path)] # keep variables in the same order as default_vars
+    input_variables_to_use = [x for x in all_possible_input_variables if x in input_variables]
+    if not len(input_variables) == len(input_variables_to_use):
+        raise Exception('ONE OR MORE DESIRED INPUTS ARE NOT IN THE FILE')
+    return [input_variables_to_use]
+
+if __name__=='__main__':
+    print(welcome_message)
 
     NPZ_DIR = '/localhome/data/datasets/climate/era5/1.40625_npz/test'
 
@@ -415,11 +509,11 @@ if __name__=='__main__':
 
     LEAD_TIME = 7 * 24 # Two week out predictions
 
-    # Go thru each npz file 
+    # Go thru each npz file
 
     num_shards = len(os.listdir(NPZ_DIR))
 
-    for idx, file in enumerate(os.listdir(NPZ_DIR)): 
+    for idx, file in enumerate(os.listdir(NPZ_DIR)):
         print(f"Using file: {file}")
 
         if "2017" in file and "31" not in file: 
@@ -439,6 +533,6 @@ if __name__=='__main__':
     # print("Calling run function")
     # run(npz_path=files_with_2018, lead_time=LEAD_TIME, in_variables=None, out_variables=out_variables, out_dir=out_directory, num_shards=num_shards, idx=0, steps=1)
 
-
     # TODO: rerun w/out relative humidity (ALL LEVELS)
     # TODO: try two weeks out (worst case one week on 2017)
+
