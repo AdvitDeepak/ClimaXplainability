@@ -7,7 +7,7 @@ import re
 import netCDF4 as nc
 import pprint 
 
-from regrid import regrid_a_file 
+from ClimaXplainability.scripts.npz_parsing.regrid import regrid_a_file 
 
 
 
